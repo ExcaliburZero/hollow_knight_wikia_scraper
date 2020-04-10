@@ -19,12 +19,13 @@ def main(argv: List[str]) -> None:
     print(args)
 
     config = Config.from_args(args)
+    io_manager = IOManager.default_streams()
 
-    if not config.validate():
+    if not config.validate(io_manager):
         print("Invalid flags")
         sys.exit(1)
 
-    run(config)
+    run(config, io_manager)
 
 
 @dataclass
@@ -33,12 +34,12 @@ class Config:
     start_page: str
     max_num_pages: Optional[int]
 
-    def validate(self, error_stream: IO[str] = sys.stderr) -> bool:
+    def validate(self, io_manager: "IOManager") -> bool:
         success = True
 
         if self.max_num_pages is not None and self.max_num_pages <= 0:
             success = False
-            error_stream.write(
+            io_manager.error_stream.write(
                 '"max_num_pages" cannot be {}, it must be a positive integer'.format(
                     self.max_num_pages
                 )
@@ -59,14 +60,29 @@ class Config:
 
 
 @dataclass
+class IOManager:
+    output_stream: IO[str]
+    error_stream: IO[str]
+    html_writer: None  # TODO: implement
+
+    @staticmethod
+    def default_streams() -> "IOManager":
+        return IOManager(
+            output_stream=sys.stdout,
+            error_stream=sys.stderr,
+            html_writer=None,  # TODO: implement
+        )
+
+
+@dataclass
 class Page:
     name: str
     outgoing_links: Set[str]
     html: str
 
 
-def run(config: Config) -> None:
-    assert config.validate()
+def run(config: Config, io_manager: "IOManager") -> None:
+    assert config.validate(io_manager)
 
     pages = recursively_download_pages(config, config.start_page)
 
