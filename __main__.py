@@ -3,6 +3,7 @@ from typing import List, IO, Set, Optional
 
 import argparse
 import sys
+import urllib.parse
 
 import bs4
 import wikia
@@ -145,10 +146,14 @@ def download_page(config: Config, page_name: str) -> Page:
 def parse_outgoing_links(soup: bs4.BeautifulSoup) -> Set[str]:
     links = (a.get("href") for a in soup.find(id="WikiaArticle").find_all("a"))
 
-    wiki_links = (link[len("/wiki/") :] for link in links if link.startswith("/wiki/"))
+    wiki_links = (
+        link[len("/wiki/") :]
+        for link in links
+        if link is not None and link.startswith("/wiki/")
+    )
 
     return {
-        remove_link_subsection(link)
+        urllib.parse.unquote(remove_link_subsection(link))
         for link in wiki_links
         if (not link.startswith("Category:")) and (not link.startswith("File:"))
     }
