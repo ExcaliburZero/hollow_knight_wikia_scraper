@@ -124,8 +124,6 @@ def recursively_download_pages(
             if outgoing_link not in downloaded_page_names:
                 pages_to_download.add(outgoing_link)
 
-    # TODO: maybe yield a message when we reach the max num downloads and want to download another
-
     return downloaded_pages
 
 
