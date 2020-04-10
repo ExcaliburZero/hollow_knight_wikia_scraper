@@ -3,6 +3,7 @@ from typing import List, IO, Set, Optional
 
 import abc
 import argparse
+import csv
 import os
 import sys
 import urllib.parse
@@ -16,6 +17,7 @@ def main(argv: List[str]) -> None:
 
     parser.add_argument("start_page")
     parser.add_argument("--max_num_pages", type=int, default=None)
+    parser.add_argument("--pages_csv", default="pages.csv")
     parser.add_argument("--page_html_dir", default="page_html")
 
     args = parser.parse_args(argv)
@@ -36,6 +38,7 @@ def main(argv: List[str]) -> None:
 class Config:
     wiki_name: str
     start_page: str
+    pages_csv: str
     page_html_dir: str
     max_num_pages: Optional[int]
 
@@ -60,19 +63,25 @@ class Config:
         return Config(
             wiki_name="HollowKnight",
             start_page=args.start_page,
+            pages_csv=args.pages_csv,
             page_html_dir=args.page_html_dir,
             max_num_pages=args.max_num_pages,
         )
 
 
-class PageWriter(abc.ABC):
+class FileWriter(abc.ABC):
     @abc.abstractmethod
     def write_html(self, page_name: str, html: str) -> str:
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def write_pages_csv(self, pages: List["Page"]) -> str:
+        raise NotImplementedError
+
 
 @dataclass
-class FilesystemPageWriter(PageWriter):
+class FilesystemWriter(FileWriter):
+    pages_csv: str
     html_dir: str
 
     def write_html(self, page_name: str, html: str) -> str:
@@ -85,19 +94,39 @@ class FilesystemPageWriter(PageWriter):
 
         return filepath
 
+    def write_pages_csv(self, pages: List["Page"]) -> str:
+        columns = ["page_name", "outgoing_links", "local_html_path"]
+
+        with open(self.pages_csv, "w") as output_stream:
+            writer = csv.DictWriter(output_stream, columns)
+
+            writer.writeheader()
+            for page in sorted(pages, key=lambda p: p.name):
+                writer.writerow(
+                    {
+                        "page_name": page.name,
+                        "outgoing_links": " ".join(page.outgoing_links),
+                        "local_html_path": page.html_path,
+                    }
+                )
+
+        return self.pages_csv
+
 
 @dataclass
 class IOManager:
     output_stream: IO[str]
     error_stream: IO[str]
-    html_writer: PageWriter
+    file_writer: FileWriter
 
     @staticmethod
     def default_streams(config: Config) -> "IOManager":
         return IOManager(
             output_stream=sys.stdout,
             error_stream=sys.stderr,
-            html_writer=FilesystemPageWriter(config.page_html_dir),
+            file_writer=FilesystemWriter(
+                pages_csv=config.pages_csv, html_dir=config.page_html_dir
+            ),
         )
 
 
@@ -115,6 +144,8 @@ def run(config: Config, io_manager: "IOManager") -> None:
 
     for page in pages:
         print(page)
+
+    io_manager.file_writer.write_pages_csv(pages)
 
 
 def recursively_download_pages(
@@ -161,7 +192,7 @@ def download_page(config: Config, io_manager: IOManager, page_name: str) -> Page
 
     outgoing_links = parse_outgoing_links(soup)
 
-    html_path = io_manager.html_writer.write_html(page_name, html)
+    html_path = io_manager.file_writer.write_html(page_name, html)
 
     return Page(name=page_name, html_path=html_path, outgoing_links=outgoing_links,)
 
