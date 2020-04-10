@@ -202,7 +202,7 @@ def recursively_download_pages(
 
 def download_page(config: Config, io_manager: IOManager, page_name: str) -> Page:
     page = wikia.page(config.wiki_name, page_name)
-    page_name_resolved = urllib.parse.quote(page.title.replace(" ", "_"))
+    page_name_resolved = page.title.replace(" ", "_")
 
     html = page.html()
     soup = bs4.BeautifulSoup(html, "html.parser")
