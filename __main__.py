@@ -218,7 +218,7 @@ def parse_outgoing_links(soup: bs4.BeautifulSoup) -> Set[str]:
     return {
         urllib.parse.unquote(remove_link_subsection(link))
         for link in wiki_links
-        if (not link.startswith("Category:")) and (not link.startswith("File:"))
+        if ":" not in link
     }
 
 
