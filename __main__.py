@@ -184,6 +184,12 @@ def recursively_download_pages(
         downloaded_pages.append(page)
         downloaded_page_names.add(page_name)
 
+        # Account for cases where the page is redirected
+        downloaded_page_names.add(page.name)
+        pages_to_download.discard(page.name)
+
+        # TODO: keep track of and resolve redirects
+
         for outgoing_link in page.outgoing_links:
             if outgoing_link not in downloaded_page_names:
                 pages_to_download.add(outgoing_link)
@@ -196,14 +202,25 @@ def recursively_download_pages(
 
 def download_page(config: Config, io_manager: IOManager, page_name: str) -> Page:
     page = wikia.page(config.wiki_name, page_name)
+    page_name_resolved = urllib.parse.quote(page.title.replace(" ", "_"))
+
     html = page.html()
     soup = bs4.BeautifulSoup(html, "html.parser")
 
     outgoing_links = parse_outgoing_links(soup)
 
-    html_path = io_manager.file_writer.write_html(page_name, html)
+    html_path = io_manager.file_writer.write_html(page_name_resolved, html)
 
-    return Page(name=page_name, html_path=html_path, outgoing_links=outgoing_links,)
+    return Page(
+        name=page_name_resolved, html_path=html_path, outgoing_links=outgoing_links,
+    )
+
+
+def remove_lore_prefix(page_name: str) -> str:
+    if page_name.startswith("Lore/"):
+        return page_name[len("Lore/") :]
+    else:
+        return page_name
 
 
 def parse_outgoing_links(soup: bs4.BeautifulSoup) -> Set[str]:
@@ -216,7 +233,7 @@ def parse_outgoing_links(soup: bs4.BeautifulSoup) -> Set[str]:
     )
 
     return {
-        urllib.parse.unquote(remove_link_subsection(link))
+        urllib.parse.unquote(remove_lore_prefix(remove_link_subsection(link)))
         for link in wiki_links
         if ":" not in link
     }
