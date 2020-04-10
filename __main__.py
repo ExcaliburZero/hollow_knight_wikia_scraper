@@ -40,7 +40,7 @@ class Config:
         if self.max_num_pages is not None and self.max_num_pages <= 0:
             success = False
             io_manager.error_stream.write(
-                '"max_num_pages" cannot be {}, it must be a positive integer'.format(
+                '"max_num_pages" cannot be {}, it must be a positive integer\n'.format(
                     self.max_num_pages
                 )
             )
@@ -84,20 +84,35 @@ class Page:
 def run(config: Config, io_manager: "IOManager") -> None:
     assert config.validate(io_manager)
 
-    pages = recursively_download_pages(config, config.start_page)
+    pages = recursively_download_pages(config, io_manager, config.start_page)
 
     for page in pages:
         print(page)
 
 
-def recursively_download_pages(config: Config, start_page: str) -> List[Page]:
+def recursively_download_pages(
+    config: Config, io_manager: "IOManager", start_page: str
+) -> List[Page]:
     pages_to_download = {start_page}
     downloaded_page_names: Set[str] = set()
     downloaded_pages: List[Page] = []
 
-    while len(pages_to_download) > 0 and config.should_download_more_pages(
-        len(downloaded_pages)
-    ):
+    while True:
+        # Stop if we run out of pages to download
+        if len(pages_to_download) == 0:
+            break
+
+        # Stop if we hit the page download limit
+        if not config.should_download_more_pages(len(downloaded_pages)):
+            assert config.max_num_pages is not None
+            io_manager.output_stream.write(
+                "Reached limit of max number of pages to download ({})\n".format(
+                    config.max_num_pages
+                )
+            )
+
+            break
+
         page_name = pages_to_download.pop()
 
         page = download_page(config, page_name)
