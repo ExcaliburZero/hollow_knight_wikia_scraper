@@ -46,6 +46,9 @@ class Config:
 
         return success
 
+    def should_download_more_pages(self, num_pages_downloaded: int) -> bool:
+        return self.max_num_pages is None or num_pages_downloaded < self.max_num_pages
+
     @staticmethod
     def from_args(args: argparse.Namespace) -> "Config":
         return Config(
@@ -55,19 +58,44 @@ class Config:
         )
 
 
-def run(config: Config) -> None:
-    assert config.validate()
-
-    start_page = download_page(config, config.start_page)
-
-    print(start_page)
-
-
 @dataclass
 class Page:
     name: str
     outgoing_links: Set[str]
     html: str
+
+
+def run(config: Config) -> None:
+    assert config.validate()
+
+    pages = recursively_download_pages(config, config.start_page)
+
+    for page in pages:
+        print(page)
+
+
+def recursively_download_pages(config: Config, start_page: str) -> List[Page]:
+    pages_to_download = {start_page}
+    downloaded_page_names: Set[str] = set()
+    downloaded_pages: List[Page] = []
+
+    while len(pages_to_download) > 0 and config.should_download_more_pages(
+        len(downloaded_pages)
+    ):
+        page_name = pages_to_download.pop()
+
+        page = download_page(config, page_name)
+
+        downloaded_pages.append(page)
+        downloaded_page_names.add(page_name)
+
+        for outgoing_link in page.outgoing_links:
+            if outgoing_link not in downloaded_page_names:
+                pages_to_download.add(outgoing_link)
+
+    # TODO: maybe yield a message when we reach the max num downloads and want to download another
+
+    return downloaded_pages
 
 
 def download_page(config: Config, page_name: str) -> Page:
