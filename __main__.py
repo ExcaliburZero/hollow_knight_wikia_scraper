@@ -9,6 +9,7 @@ import sys
 import urllib.parse
 
 import bs4
+import progressbar
 import wikia
 
 
@@ -155,6 +156,9 @@ def recursively_download_pages(
     downloaded_page_names: Set[str] = set()
     downloaded_pages: List[Page] = []
 
+    pbar = progressbar.ProgressBar(fd=io_manager.output_stream)
+
+    i = 0
     while True:
         # Stop if we run out of pages to download
         if len(pages_to_download) == 0:
@@ -162,6 +166,8 @@ def recursively_download_pages(
 
         # Stop if we hit the page download limit
         if not config.should_download_more_pages(len(downloaded_pages)):
+            pbar.finish()
+
             assert config.max_num_pages is not None
             io_manager.output_stream.write(
                 "Reached limit of max number of pages to download ({})\n".format(
@@ -181,6 +187,9 @@ def recursively_download_pages(
         for outgoing_link in page.outgoing_links:
             if outgoing_link not in downloaded_page_names:
                 pages_to_download.add(outgoing_link)
+
+        i += 1
+        pbar.update(i)
 
     return downloaded_pages
 
