@@ -12,6 +12,8 @@ import bs4
 import progressbar
 import wikia
 
+import graph
+
 
 def main(argv: List[str]) -> None:
     parser = argparse.ArgumentParser()
@@ -19,6 +21,7 @@ def main(argv: List[str]) -> None:
     parser.add_argument("start_page")
     parser.add_argument("--max_num_pages", type=int, default=None)
     parser.add_argument("--pages_csv", default="pages.csv")
+    parser.add_argument("--link_graph_dot", default="links.dot")
     parser.add_argument("--page_html_dir", default="page_html")
 
     args = parser.parse_args(argv)
@@ -40,6 +43,7 @@ class Config:
     wiki_name: str
     start_page: str
     pages_csv: str
+    link_graph_dot: str
     page_html_dir: str
     max_num_pages: Optional[int]
 
@@ -65,6 +69,7 @@ class Config:
             wiki_name="HollowKnight",
             start_page=args.start_page,
             pages_csv=args.pages_csv,
+            link_graph_dot=args.link_graph_dot,
             page_html_dir=args.page_html_dir,
             max_num_pages=args.max_num_pages,
         )
@@ -79,10 +84,15 @@ class FileWriter(abc.ABC):
     def write_pages_csv(self, pages: List["Page"]) -> str:
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def write_link_graph(self, link_graph: graph.DirectedGraph) -> str:
+        raise NotImplementedError
+
 
 @dataclass
 class FilesystemWriter(FileWriter):
     pages_csv: str
+    link_graph_dot: str
     html_dir: str
 
     def write_html(self, page_name: str, html: str) -> str:
@@ -113,6 +123,12 @@ class FilesystemWriter(FileWriter):
 
         return self.pages_csv
 
+    def write_link_graph(self, link_graph: graph.DirectedGraph) -> str:
+        with open(self.link_graph_dot, "w") as output_stream:
+            link_graph.write_dot(output_stream)
+
+        return self.link_graph_dot
+
 
 @dataclass
 class IOManager:
@@ -126,7 +142,9 @@ class IOManager:
             output_stream=sys.stdout,
             error_stream=sys.stderr,
             file_writer=FilesystemWriter(
-                pages_csv=config.pages_csv, html_dir=config.page_html_dir
+                pages_csv=config.pages_csv,
+                link_graph_dot=config.link_graph_dot,
+                html_dir=config.page_html_dir,
             ),
         )
 
@@ -138,23 +156,28 @@ class Page:
     html_path: str
 
 
+@dataclass
+class Results:
+    pages: List[Page]
+    link_graph: graph.DirectedGraph
+
+
 def run(config: Config, io_manager: "IOManager") -> None:
     assert config.validate(io_manager)
 
-    pages = recursively_download_pages(config, io_manager, config.start_page)
+    results = recursively_download_pages(config, io_manager, config.start_page)
 
-    for page in pages:
-        print(page)
-
-    io_manager.file_writer.write_pages_csv(pages)
+    io_manager.file_writer.write_pages_csv(results.pages)
+    io_manager.file_writer.write_link_graph(results.link_graph)
 
 
 def recursively_download_pages(
     config: Config, io_manager: "IOManager", start_page: str
-) -> List[Page]:
+) -> Results:
     pages_to_download = {start_page}
     downloaded_page_names: Set[str] = set()
     downloaded_pages: List[Page] = []
+    link_graph = graph.DirectedGraph({})
 
     pbar = progressbar.ProgressBar(fd=io_manager.output_stream)
 
@@ -179,7 +202,22 @@ def recursively_download_pages(
 
         page_name = pages_to_download.pop()
 
-        page = download_page(config, io_manager, page_name)
+        try:
+            page = download_page(config, io_manager, page_name)
+        except Exception as e:
+            pbar.finish()
+
+            io_manager.error_stream.write(str(e))
+            io_manager.error_stream.write(
+                'Error occured when attempting to download page "{}", so no further pages will be downloaded.\n'.format(
+                    page_name
+                )
+            )
+
+            break
+
+        for outgoing_link in page.outgoing_links:
+            link_graph.add_edge(page.name, outgoing_link)
 
         downloaded_pages.append(page)
         downloaded_page_names.add(page_name)
@@ -197,7 +235,7 @@ def recursively_download_pages(
         i += 1
         pbar.update(i)
 
-    return downloaded_pages
+    return Results(pages=downloaded_pages, link_graph=link_graph,)
 
 
 def download_page(config: Config, io_manager: IOManager, page_name: str) -> Page:

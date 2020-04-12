@@ -32,4 +32,4 @@ jobs:
     - name: Check formatting using black
       run: |
         pip install black
-        black __main__.py --check
+        black *.py --check
