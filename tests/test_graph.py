@@ -3,6 +3,7 @@ import unittest
 
 from .context import hollow_knight_wikia_scraper as hkws
 
+
 class TestDirectedGraph(unittest.TestCase):
     def test_write_dot_empty(self) -> None:
         graph = hkws.graph.DirectedGraph({})
@@ -15,7 +16,6 @@ class TestDirectedGraph(unittest.TestCase):
 
         self.assertEqual(expected, actual)
 
-
     def test_write_dot_some_entries(self) -> None:
         graph = hkws.graph.DirectedGraph({})
         output_stream = io.StringIO()
@@ -25,10 +25,12 @@ class TestDirectedGraph(unittest.TestCase):
 
         graph.write_dot(output_stream)
 
-        expected = "digraph {\n" +\
-            "  \"Knight\" -> \"Charms\";\n" +\
-            "  \"Knight\" -> \"Hollow_Knight\";\n" +\
-            "}\n"
+        expected = (
+            "digraph {\n"
+            + '  "Knight" -> "Charms";\n'
+            + '  "Knight" -> "Hollow_Knight";\n'
+            + "}\n"
+        )
         actual = output_stream.getvalue()
 
         self.assertEqual(expected, actual)
