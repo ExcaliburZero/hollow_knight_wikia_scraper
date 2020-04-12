@@ -23,7 +23,7 @@ jobs:
     - name: Typecheck using mypy
       run: |
         pip install mypy lxml
-        mypy *.py --ignore-missing-imports --strict --html-report type-checking
+        mypy **/*.py --ignore-missing-imports --strict --html-report type-checking
     - name: Archive mypy report
       uses: actions/upload-artifact@v1.0.0
       with:
@@ -32,4 +32,4 @@ jobs:
     - name: Check formatting using black
       run: |
         pip install black
-        black *.py --check
+        black **/*.py --check
