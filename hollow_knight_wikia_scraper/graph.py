@@ -15,7 +15,8 @@ class DirectedGraph:
     def write_dot(self, output_stream: IO[str]) -> None:
         output_stream.write("digraph {\n")
 
-        for source, dests in self.edges.items():
+        for source in sorted(self.edges.keys()):
+            dests = self.edges[source]
             for destination in sorted(dests):
                 output_stream.write('  "{}" -> "{}";\n'.format(source, destination))
 
