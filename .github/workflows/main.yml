@@ -23,13 +23,17 @@ jobs:
     - name: Typecheck using mypy
       run: |
         pip install mypy lxml
-        mypy **/*.py --ignore-missing-imports --strict --html-report type-checking
+        make typecheck
     - name: Archive mypy report
       uses: actions/upload-artifact@v1.0.0
       with:
         name: type-checking-coverage
         path: type-checking
+    - name: Run unit tests
+      run: |
+        pip install nose
+        make unit-test
     - name: Check formatting using black
       run: |
         pip install black
-        black **/*.py --check
+        make check-formatting
